@@ -24,7 +24,10 @@ func TestMainOutput(t *testing.T) {
 	w.Close()
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, err = io.Copy(&buf, r)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	expected := "Hello World!\n"
 	if buf.String() != expected {
