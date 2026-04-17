@@ -5,6 +5,6 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /bin/app ./cmd/go-service
 
-FROM gcr.io/distroless/static-debian12:nonroot@sha256:c7742da01aa7ee169d59e58a91c35da9c13e67f555dcd8b2ada15887aa619e6c AS runner
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:a9329520abc449e3b14d5bc3a6ffae065bdde0f02667fa10880c49b35c109fd1 AS runner
 COPY --from=builder /bin/app /bin/app
 ENTRYPOINT ["/bin/app"]
