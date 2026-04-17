@@ -22,7 +22,7 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
           node-version-file: ${{ inputs.service_path }}/package.json
-          cache: true
+          cache: 'npm'
           cache-dependency-path: ${{ inputs.service_path }}/package-lock.json
       
       - name: Install dependencies
@@ -47,7 +47,7 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
           node-version-file: ${{ inputs.service_path }}/package.json
-          cache: true
+          cache: 'npm'
           cache-dependency-path: ${{ inputs.service_path }}/package-lock.json
       
       - name: Install dependencies
@@ -81,6 +81,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      
+      - name: Login registry
+        uses: ./.github/actions/registry-login
+        if: inputs.publish
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build candidate
         id: build-image
@@ -100,6 +108,13 @@ jobs:
     if: inputs.publish
     permissions: {contents: read, packages: read}
     steps:
+      - name: Login registry
+        uses: ./.github/actions/registry-login
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Security post-scan
         uses: ./.github/actions/security-post-scan
         with:
@@ -113,6 +128,13 @@ jobs:
     needs: [build, post-scan]
     if: inputs.publish
     steps:
+      - name: Login registry
+        uses: ./.github/actions/registry-login
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
       - name: Promote image
         uses: ./.github/actions/image-promote
         with:

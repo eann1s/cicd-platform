@@ -1,11 +1,15 @@
 name: Login registry
 description: Login to registry
+inputs:
+  registry: {required: true, description: "Registry to login to"}
+  username: {required: true, description: "Username to login with"}
+  password: {required: true, description: "Password to login with"}
 runs:
   using: composite
   steps:
     - name: Login registry
       uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
       with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        registry: ${{ inputs.registry }}
+        username: ${{ inputs.username }}
+        password: ${{ inputs.password }}

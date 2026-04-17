@@ -2,10 +2,10 @@ name: ci-go-service
 
 on:
   pull_request:
-    paths: ["consumers/go-service/**"]
+    paths: ["consumers/go-service/**", ".github/workflows/ci-go-service.yml", ".github/workflows/reusable-service-go.yml", ".github/actions/**"]
   push:
     branches: ["main", "master"]
-    paths: [ "consumers/go-service/**" ]
+    paths: ["consumers/go-service/**", ".github/workflows/ci-go-service.yml", ".github/workflows/reusable-service-go.yml", ".github/actions/**"]
 
 jobs:
   call:

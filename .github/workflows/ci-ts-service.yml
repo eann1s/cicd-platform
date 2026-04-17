@@ -2,10 +2,10 @@ name: ci-ts-service
 
 on:
   pull_request:
-    paths: ["consumers/node-service/**"]
+    paths: ["consumers/node-service/**", ".github/workflows/ci-ts-service.yml", ".github/workflows/reusable-service-ts.yml", ".github/actions/**"]
   push:
     branches: ["main", "master"]
-    paths: [ "consumers/node-service/**" ]
+    paths: [ "consumers/node-service/**", ".github/workflows/ci-ts-service.yml", ".github/workflows/reusable-service-ts.yml", ".github/actions/**"]
 
 jobs:
   call:

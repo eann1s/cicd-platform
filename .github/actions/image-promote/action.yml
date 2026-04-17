@@ -6,9 +6,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Login registry
-      uses: ./.github/actions/registry-login
-
     - name: "Publish"
       shell: bash
       run: |

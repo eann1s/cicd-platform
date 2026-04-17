@@ -21,10 +21,6 @@ runs:
           type=sha
           type=ref,event=branch
     
-    - name: Login registry
-      if: ${{ inputs.publish == 'true' }}
-      uses: ./.github/actions/registry-login
-    
     - name: Build and optionally push
       id: build-image
       uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
