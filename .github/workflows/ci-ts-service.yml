@@ -9,6 +9,7 @@ on:
 
 jobs:
   call:
+    permissions: {contents: read, packages: write}
     uses: "./.github/workflows/reusable-service-ts.yml"
     with:
       service_path: consumers/node-service

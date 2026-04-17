@@ -9,6 +9,7 @@ on:
 
 jobs:
   call:
+    permissions: {contents: read, packages: write}
     uses: "./.github/workflows/reusable-service-go.yml"
     with:
       service_path: consumers/go-service
