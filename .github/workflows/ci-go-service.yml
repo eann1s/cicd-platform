@@ -1,0 +1,17 @@
+name: ci-go-service
+
+on:
+  pull_request:
+    paths: ["consumers/go-service/**"]
+  push:
+    branches: ["main", "master"]
+    paths: [ "consumers/go-service/**" ]
+
+jobs:
+  call:
+    uses: "./.github/workflows/reusable-service-go.yml"
+    with:
+      service_path: consumers/go-service
+      image_name: go-service
+      publish: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
+

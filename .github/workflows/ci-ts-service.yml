@@ -1,0 +1,16 @@
+name: ci-ts-service
+
+on:
+  pull_request:
+    paths: ["consumers/node-service/**"]
+  push:
+    branches: ["main", "master"]
+    paths: [ "consumers/node-service/**" ]
+
+jobs:
+  call:
+    uses: "./.github/workflows/reusable-service-ts.yml"
+    with:
+      service_path: consumers/node-service
+      image_name: node-service
+      publish: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}

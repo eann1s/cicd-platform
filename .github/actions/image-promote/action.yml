@@ -1,0 +1,18 @@
+name: Image promote
+description: Promote image
+inputs:
+  image_name: {required: true, description: "Image to promote"}
+  image_digest: {required: true, description: "Digest of the image to promote"}
+runs:
+  using: composite
+  steps:
+    - name: Login registry
+      uses: ./.github/actions/registry-login
+
+    - name: "Publish"
+      shell: bash
+      run: |
+        docker buildx imagetools create \
+          --tag ghcr.io/${{ github.repository }}/${{ inputs.image_name }}:latest \
+          --tag ghcr.io/${{ github.repository }}/${{ inputs.image_name }}:${{ github.sha }} \
+          ghcr.io/${{ github.repository }}/${{ inputs.image_name }}@${{ inputs.image_digest }}

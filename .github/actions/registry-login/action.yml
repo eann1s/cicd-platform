@@ -1,0 +1,11 @@
+name: Login registry
+description: Login to registry
+runs:
+  using: composite
+  steps:
+    - name: Login registry
+      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}

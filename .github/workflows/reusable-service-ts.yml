@@ -1,0 +1,120 @@
+name: reusable-service-ts
+
+on:
+  workflow_call:
+    inputs:
+      service_path: { required: true, type: string }
+      image_name: { required: true, type: string }
+      publish: { required: false, type: boolean, default: false }
+
+env:
+  SCAN_SEVERITY: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && 'HIGH,CRITICAL' || 'CRITICAL' }} # CRITICAL,HIGH on master/main and CRITICAL on PRs
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    permissions: { contents: read }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Setup-runtime
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version-file: ${{ inputs.service_path }}/package.json
+          cache: true
+          cache-dependency-path: ${{ inputs.service_path }}/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ${{ inputs.service_path }}
+        run: |
+          npm ci
+      
+      - name: Lint
+        working-directory: ${{ inputs.service_path }}
+        run: |
+          npm run lint
+  
+  test:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    permissions: { contents: read }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      
+      - name: Setup-runtime
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version-file: ${{ inputs.service_path }}/package.json
+          cache: true
+          cache-dependency-path: ${{ inputs.service_path }}/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ${{ inputs.service_path }}
+        run: |
+          npm ci
+      
+      - name: Test
+        working-directory: ${{ inputs.service_path }}
+        run: |
+          npm run test
+  
+  pre-scan:
+    runs-on: ubuntu-latest
+    needs: [test]
+    permissions: {contents: read}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Security pre-scan
+        uses: ./.github/actions/security-pre-scan
+        with:
+          service_path: ${{ inputs.service_path }}
+          severity: ${{ env.SCAN_SEVERITY }}
+  
+  build:
+    runs-on: ubuntu-latest
+    needs: [pre-scan]
+    permissions: { contents: read, packages: write }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Build candidate
+        id: build-image
+        uses: ./.github/actions/build-candidate
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ inputs.image_name }}
+          context: ${{ inputs.service_path }}
+          dockerfile_path: ${{ inputs.service_path }}/Dockerfile
+          publish: ${{ inputs.publish }}
+          tags: ghcr.io/${{ github.repository }}/${{ inputs.image_name }}:candidate-${{ github.sha }}
+    outputs:
+      image_digest: ${{ steps.build-image.outputs.digest }}
+
+  post-scan:
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: inputs.publish
+    permissions: {contents: read, packages: read}
+    steps:
+      - name: Security post-scan
+        uses: ./.github/actions/security-post-scan
+        with:
+          image_name: ${{ inputs.image_name }}
+          image_digest: ${{ needs.build.outputs.image_digest }}
+          severity: ${{ env.SCAN_SEVERITY }}
+
+  publish:
+    runs-on: ubuntu-latest
+    permissions: {contents: read, packages: write}
+    needs: [build, post-scan]
+    if: inputs.publish
+    steps:
+      - name: Promote image
+        uses: ./.github/actions/image-promote
+        with:
+          image_name: ${{ inputs.image_name }}
+          image_digest: ${{ needs.build.outputs.image_digest }}
