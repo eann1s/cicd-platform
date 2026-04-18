@@ -1,4 +1,4 @@
-FROM golang:1.26.2-alpine3.22@sha256:6ebcc4eb3726dd548c71ad97fc8c9ab7f6d60a45fbfb7c6b734ec0489fa25c41
+FROM golang:1.26.2-alpine3.22@sha256:6ebcc4eb3726dd548c71ad97fc8c9ab7f6d60a45fbfb7c6b734ec0489fa25c41 AS builder
 WORKDIR /app
 COPY go.mod ./
 RUN go mod download
