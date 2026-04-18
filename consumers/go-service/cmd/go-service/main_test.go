@@ -21,7 +21,10 @@ func TestMainOutput(t *testing.T) {
 
 	main()
 	
-	w.Close()
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, r)
