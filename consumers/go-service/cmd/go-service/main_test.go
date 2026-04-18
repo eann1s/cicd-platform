@@ -32,7 +32,7 @@ func TestMainOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := "Hello World!\n"
+	expected := "Hello World!!!\n"
 	if buf.String() != expected {
 		t.Errorf("Expected '%s', got '%s'", expected, buf.String())
 	}
