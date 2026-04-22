@@ -1,8 +1,7 @@
 name: Security Post Scan
 description: Image vulnerabilities scan + SBOM generation
 inputs:
-  image_name: {required: true, description: "Image to scan"}
-  image_digest: {required: true, description: "Digest of the image to scan"}
+  image_with_digest: {required: true, description: "Image with digest"}
   severity: {required: true, description: "Severity of vulnerabilities to scan for. E.g. HIGH,CRITICAL"}
 runs:
   using: composite
@@ -11,7 +10,7 @@ runs:
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1
         with:
           scan-type: image
-          scan-ref: ghcr.io/${{ github.repository }}/${{ inputs.image_name }}@${{ inputs.image_digest }}
+          scan-ref: ${{ inputs.image_with_digest }}
           severity: ${{ inputs.severity }}
           ignore-unfixed: false
           exit-code: 1
@@ -22,7 +21,7 @@ runs:
       - name: SBOM generation
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
         with:
-          image: ghcr.io/${{ github.repository }}/${{ inputs.image_name }}@${{ inputs.image_digest }}
+          image: ${{ inputs.image_with_digest }}
           format: cyclonedx-json
           output-file: image-sbom.cdx.json
       

@@ -4,15 +4,25 @@ on:
   pull_request:
     paths: ["consumers/go-service/**", ".github/workflows/ci-go-service.yml", ".github/workflows/reusable-service-go.yml", ".github/actions/**"]
   push:
-    branches: ["main", "master"]
+    branches: ["master"]
     paths: ["consumers/go-service/**", ".github/workflows/ci-go-service.yml", ".github/workflows/reusable-service-go.yml", ".github/actions/**"]
 
 jobs:
-  call:
-    permissions: {contents: read, packages: write}
+  call_pr:
+    if: github.event_name == 'pull_request'
+    permissions: {contents: read}
     uses: "./.github/workflows/reusable-service-go.yml"
     with:
       service_path: consumers/go-service
       image_name: go-service
-      publish: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
+      publish: false
+
+  call_push:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions: {contents: read, packages: write, id-token: write}
+    uses: "./.github/workflows/reusable-service-go.yml"
+    with:
+      service_path: consumers/go-service
+      image_name: go-service
+      publish: true
 

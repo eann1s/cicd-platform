@@ -1,7 +1,7 @@
 name: Image promote
 description: Promote image
 inputs:
-  image_name: {required: true, description: "Image to promote"}
+  image: {required: true, description: "Image to promote"}
   image_digest: {required: true, description: "Digest of the image to promote"}
 runs:
   using: composite
@@ -10,6 +10,6 @@ runs:
       shell: bash
       run: |
         docker buildx imagetools create \
-          --tag ghcr.io/${{ github.repository }}/${{ inputs.image_name }}:latest \
-          --tag ghcr.io/${{ github.repository }}/${{ inputs.image_name }}:${{ github.sha }} \
-          ghcr.io/${{ github.repository }}/${{ inputs.image_name }}@${{ inputs.image_digest }}
+          --tag ${{ inputs.image }}:latest \
+          --tag ${{ inputs.image }}:${{ github.sha }} \
+          ${{ inputs.image }}@${{ inputs.image_digest }}

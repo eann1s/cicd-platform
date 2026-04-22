@@ -1,0 +1,18 @@
+name: Image verify
+description: Verify Cosign signature and identity for container image digest
+inputs:
+  image_with_digest: {required: true, description: "Image with digest"}
+  certificate_oidc_issuer: {required: true, description: "OIDC issuer"}
+  certificate_identity: {required: true, description: "Certificate identity"}
+runs:
+  using: composite
+  steps:
+    - name: Setup Cosign
+      uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003  
+      with:
+        cosign-release: 'v3.0.6'
+    
+    - name: Verify image
+      shell: bash
+      run: |
+        cosign verify --certificate-identity ${{ inputs.certificate_identity }} --certificate-oidc-issuer ${{ inputs.certificate_oidc_issuer }} ${{ inputs.image_with_digest }}

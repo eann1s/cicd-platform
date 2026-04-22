@@ -4,14 +4,25 @@ on:
   pull_request:
     paths: ["consumers/node-service/**", ".github/workflows/ci-ts-service.yml", ".github/workflows/reusable-service-ts.yml", ".github/actions/**"]
   push:
-    branches: ["main", "master"]
+    branches: ["master"]
     paths: [ "consumers/node-service/**", ".github/workflows/ci-ts-service.yml", ".github/workflows/reusable-service-ts.yml", ".github/actions/**"]
 
 jobs:
-  call:
-    permissions: {contents: read, packages: write}
+  call_pr:
+    if: github.event_name == 'pull_request'
+    permissions: {contents: read}
     uses: "./.github/workflows/reusable-service-ts.yml"
     with:
       service_path: consumers/node-service
       image_name: node-service
-      publish: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
+      publish: false
+  
+  call_push:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions: {contents: read, packages: write, id-token: write}
+    uses: "./.github/workflows/reusable-service-ts.yml"
+    with:
+      service_path: consumers/node-service
+      image_name: node-service
+      publish: true
+

@@ -1,0 +1,16 @@
+name: Image sign
+description: Sign container image digest with Cosign (keyless OIDC)
+inputs:
+  image_with_digest: {required: true, description: "Image with digest"}
+runs:
+  using: composite
+  steps:
+    - name: Setup Cosign
+      uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003  
+      with:
+        cosign-release: 'v3.0.6'
+
+    - name: Sign image
+      shell: bash
+      run: |
+        cosign sign --yes ${{ inputs.image_with_digest }}
