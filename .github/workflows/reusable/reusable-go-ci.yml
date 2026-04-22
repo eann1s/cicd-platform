@@ -1,0 +1,83 @@
+name: reusable-go-ci
+
+on:
+  workflow_call:
+    inputs:
+      service_path: { required: true, type: string }
+      image_name: { required: true, type: string }
+
+env:
+  SCAN_SEVERITY: ${{ github.ref == 'refs/heads/master' && 'HIGH,CRITICAL' || 'CRITICAL' }} # CRITICAL,HIGH on master and CRITICAL on PRs
+  IMAGE: ghcr.io/${{ github.repository }}/${{ inputs.image_name }}
+
+jobs:
+  lint: 
+    runs-on: ubuntu-latest
+    permissions: { contents: read }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Setup-runtime
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: ${{ inputs.service_path }}/go.mod
+          cache: true
+      
+      - name: Lint
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20
+        with:
+          working-directory: ${{ inputs.service_path }}
+
+  test:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    permissions: { contents: read }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      
+      - name: Setup-runtime
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: ${{ inputs.service_path }}/go.mod
+          cache: true
+      
+      - name: Test
+        run: |
+          go test -v ./...
+          go test -race ./...
+        working-directory: ${{ inputs.service_path }}     
+  
+  pre-scan:
+    runs-on: ubuntu-latest
+    needs: [test]
+    permissions: {contents: read}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Security pre-scan
+        uses: ./.github/actions/security-pre-scan
+        with:
+          service_path: ${{ inputs.service_path }}
+          severity: ${{ env.SCAN_SEVERITY }}
+  
+  build:
+    runs-on: ubuntu-latest
+    needs: [pre-scan]
+    permissions: { contents: read }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Build candidate
+        id: build-image
+        uses: ./.github/actions/build-candidate
+        with:
+          images: ${{ env.IMAGE }}
+          context: ${{ inputs.service_path }}
+          dockerfile_path: ${{ inputs.service_path }}/Dockerfile
+          publish: false
+          tags: ${{ env.IMAGE }}:candidate-${{ github.sha }}
+  

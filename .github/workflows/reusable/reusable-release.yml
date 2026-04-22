@@ -1,85 +1,20 @@
-name: reusable-service-ts
+name: reusable-release
 
 on:
   workflow_call:
     inputs:
       service_path: { required: true, type: string }
       image_name: { required: true, type: string }
-      publish: { required: false, type: boolean, default: false }
 
 env:
   SCAN_SEVERITY: ${{ github.ref == 'refs/heads/master' && 'HIGH,CRITICAL' || 'CRITICAL' }} # CRITICAL,HIGH on master and CRITICAL on PRs
   IMAGE: ghcr.io/${{ github.repository }}/${{ inputs.image_name }}
   CERTIFICATE_OIDC_ISSUER: https://token.actions.githubusercontent.com
-  CERTIFICATE_IDENTITY: https://github.com/eann1s/cicd-platform/.github/workflows/reusable-service-ts.yml@refs/heads/master
+  CERTIFICATE_IDENTITY: https://github.com/eann1s/cicd-platform/.github/workflows/reusable/reusable-release.yml@refs/heads/master
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    permissions: { contents: read }
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-
-      - name: Setup-runtime
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
-        with:
-          node-version-file: ${{ inputs.service_path }}/package.json
-          cache: 'npm'
-          cache-dependency-path: ${{ inputs.service_path }}/package-lock.json
-      
-      - name: Install dependencies
-        working-directory: ${{ inputs.service_path }}
-        run: |
-          npm ci
-      
-      - name: Lint
-        working-directory: ${{ inputs.service_path }}
-        run: |
-          npm run lint
-  
-  test:
-    runs-on: ubuntu-latest
-    needs: [lint]
-    permissions: { contents: read }
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-      
-      - name: Setup-runtime
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
-        with:
-          node-version-file: ${{ inputs.service_path }}/package.json
-          cache: 'npm'
-          cache-dependency-path: ${{ inputs.service_path }}/package-lock.json
-      
-      - name: Install dependencies
-        working-directory: ${{ inputs.service_path }}
-        run: |
-          npm ci
-      
-      - name: Test
-        working-directory: ${{ inputs.service_path }}
-        run: |
-          npm run test
-  
-  pre-scan:
-    runs-on: ubuntu-latest
-    needs: [test]
-    permissions: {contents: read}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-
-      - name: Security pre-scan
-        uses: ./.github/actions/security-pre-scan
-        with:
-          service_path: ${{ inputs.service_path }}
-          severity: ${{ env.SCAN_SEVERITY }}
-  
   build:
     runs-on: ubuntu-latest
-    needs: [pre-scan]
     permissions: { contents: read, packages: write }
     steps:
       - name: Checkout
@@ -87,7 +22,6 @@ jobs:
       
       - name: Login registry
         uses: ./.github/actions/registry-login
-        if: inputs.publish
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -100,15 +34,14 @@ jobs:
           images: ${{ env.IMAGE }}
           context: ${{ inputs.service_path }}
           dockerfile_path: ${{ inputs.service_path }}/Dockerfile
-          publish: ${{ inputs.publish }}
+          publish: true
           tags: ${{ env.IMAGE }}:candidate-${{ github.sha }}
     outputs:
       image_digest: ${{ steps.build-image.outputs.digest }}
-
+  
   post-scan:
     runs-on: ubuntu-latest
     needs: [build]
-    if: inputs.publish
     permissions: {contents: read, packages: read}
     steps:
       - name: Checkout
@@ -141,7 +74,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Sign image
         uses: ./.github/actions/image-sign
         with:
@@ -173,7 +106,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {contents: read, packages: write}
     needs: [build, verify]
-    if: inputs.publish
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -184,9 +116,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Promote image
         uses: ./.github/actions/image-promote
         with:
           image: ${{ env.IMAGE }}
           image_digest: ${{ needs.build.outputs.image_digest }}
+
