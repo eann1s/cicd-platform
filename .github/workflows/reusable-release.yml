@@ -10,7 +10,7 @@ env:
   SCAN_SEVERITY: ${{ github.ref == 'refs/heads/master' && 'HIGH,CRITICAL' || 'CRITICAL' }} # CRITICAL,HIGH on master and CRITICAL on PRs
   IMAGE: ghcr.io/${{ github.repository }}/${{ inputs.image_name }}
   CERTIFICATE_OIDC_ISSUER: https://token.actions.githubusercontent.com
-  CERTIFICATE_IDENTITY: https://github.com/eann1s/cicd-platform/.github/workflows/reusable/reusable-release.yml@refs/heads/master
+  CERTIFICATE_IDENTITY: https://github.com/eann1s/cicd-platform/.github/workflows/reusable-release.yml@refs/heads/master
 
 jobs:
   build:
@@ -122,4 +122,3 @@ jobs:
         with:
           image: ${{ env.IMAGE }}
           image_digest: ${{ needs.build.outputs.image_digest }}
-

@@ -2,16 +2,16 @@ name: ci-go-service
 
 on:
   pull_request:
-    paths: ["consumers/go-service/**", ".github/workflows/ci-go-service.yml", ".github/workflows/reusable/reusable-go-ci.yml", ".github/workflows/reusable/reusable-release.yml", ".github/actions/**"]
+    paths: ["consumers/go-service/**", ".github/workflows/ci-go-service.yml", ".github/workflows/reusable-go-ci.yml", ".github/workflows/reusable-release.yml", ".github/actions/**"]
   push:
     branches: ["master"]
-    paths: ["consumers/go-service/**", ".github/workflows/ci-go-service.yml", ".github/workflows/reusable/reusable-go-ci.yml", ".github/workflows/reusable/reusable-release.yml", ".github/actions/**"]
+    paths: ["consumers/go-service/**", ".github/workflows/ci-go-service.yml", ".github/workflows/reusable-go-ci.yml", ".github/workflows/reusable-release.yml", ".github/actions/**"]
 
 jobs:
   call_pr:
     if: github.event_name == 'pull_request'
     permissions: {contents: read}
-    uses: "./.github/workflows/reusable/reusable-go-ci.yml"
+    uses: "./.github/workflows/reusable-go-ci.yml"
     with:
       service_path: consumers/go-service
       image_name: go-service
@@ -19,7 +19,7 @@ jobs:
   ci_push:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions: {contents: read}
-    uses: "./.github/workflows/reusable/reusable-go-ci.yml"
+    uses: "./.github/workflows/reusable-go-ci.yml"
     with:
       service_path: consumers/go-service
       image_name: go-service
@@ -28,8 +28,7 @@ jobs:
     needs: [ci_push]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions: {contents: read, packages: write, id-token: write}
-    uses: "./.github/workflows/reusable/reusable-release.yml"
+    uses: "./.github/workflows/reusable-release.yml"
     with:
       service_path: consumers/go-service
       image_name: go-service
-
