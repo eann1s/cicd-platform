@@ -4,7 +4,7 @@ on:
   pull_request:
     paths: ["consumers/go-service/**", ".github/workflows/ci-go-service.yml", ".github/workflows/reusable-go-ci.yml", ".github/workflows/reusable-release.yml", ".github/actions/**"]
   push:
-    branches: ["master"]
+    branches: ["master", "evidence/security-negative/**"]
     paths: ["consumers/go-service/**", ".github/workflows/ci-go-service.yml", ".github/workflows/reusable-go-ci.yml", ".github/workflows/reusable-release.yml", ".github/actions/**"]
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
       image_name: go-service
   
   ci_push:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/evidence/security-negative/'))
     permissions: {contents: read}
     uses: "./.github/workflows/reusable-go-ci.yml"
     with:
@@ -26,7 +26,7 @@ jobs:
 
   release_push:
     needs: [ci_push]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/evidence/security-negative/'))
     permissions: {contents: read, packages: write, id-token: write}
     uses: "./.github/workflows/reusable-release.yml"
     with:
