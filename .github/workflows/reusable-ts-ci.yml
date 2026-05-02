@@ -5,6 +5,7 @@ on:
     inputs:
       service_path: { required: true, type: string }
       image_name: { required: true, type: string }
+      platforms: { required: false, type: string }
 
 env:
   SCAN_SEVERITY: ${{ github.ref == 'refs/heads/master' && 'HIGH,CRITICAL' || 'CRITICAL' }} # CRITICAL,HIGH on master and CRITICAL on PRs
@@ -86,6 +87,7 @@ jobs:
         id: build-image
         uses: ./.github/actions/build-candidate
         with:
+          platforms: ${{ inputs.platforms }}
           images: ${{ env.IMAGE }}
           context: ${{ inputs.service_path }}
           dockerfile_path: ${{ inputs.service_path }}/Dockerfile

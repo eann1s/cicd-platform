@@ -1,6 +1,7 @@
 name: Build candidate
 description: Build candidate
 inputs:
+  platforms: {required: true, description: "Platforms to build"}
   images: {required: true, description: "Images to build"}
   context: {required: true, description: "Context path"}
   dockerfile_path: {required: true, description: "Dockerfile path"}
@@ -21,10 +22,14 @@ runs:
           type=sha
           type=ref,event=branch
     
+    - name: Setup QEMU action
+      uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a
+    
     - name: Build and optionally push
       id: build-image
       uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
       with:
+        platforms: ${{ inputs.platforms }}
         context: ${{ inputs.context }}
         file: ${{ inputs.dockerfile_path }}
         push: ${{ inputs.publish == 'true' }}

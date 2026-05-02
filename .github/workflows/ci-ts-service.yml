@@ -15,6 +15,7 @@ jobs:
     with:
       service_path: consumers/node-service
       image_name: node-service
+      platforms: linux/amd64
   
   ci_push:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -23,6 +24,7 @@ jobs:
     with:
       service_path: consumers/node-service
       image_name: node-service
+      platforms: linux/amd64
   
   release_push:
     needs: [ci_push]
@@ -32,3 +34,4 @@ jobs:
     with:
       service_path: consumers/node-service
       image_name: node-service
+      platforms: linux/amd64,linux/arm64
