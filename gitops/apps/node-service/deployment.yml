@@ -13,6 +13,8 @@ spec:
       labels:
         app: node-service
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull
       containers:
         - name: node-service
           image: node-service

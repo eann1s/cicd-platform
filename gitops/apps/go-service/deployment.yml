@@ -13,6 +13,8 @@ spec:
       labels:
         app: go-service
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull
       containers:
         - name: go-service
           image: go-service
