@@ -10,4 +10,4 @@ resources:
 images:
   - name: node-service
     newName: ghcr.io/eann1s/cicd-platform/node-service
-    digest: sha256:7ff57d14b5b844408c105b2b496e25afc12ecf9b871fccc2ec662ee7710f0c3f
+    digest: sha256:d4b8d0eada0490b36e90117cfa178fae53ba361315cd378a893beeb6306bd2ff
