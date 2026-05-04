@@ -1,0 +1,42 @@
+name: dev-publish-go-service
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env: 
+  SERVICE_PATH: consumers/go-service
+  IMAGE: ghcr.io/${{ github.repository }}/go-service
+  PLATFORMS: linux/amd64,linux/arm64
+  
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, packages: write }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      
+      - name: Login registry
+        uses: ./.github/actions/registry-login
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build candidate
+        id: build-image
+        uses: ./.github/actions/build-candidate
+        with:
+          platforms: ${{ env.PLATFORMS }}
+          images: ${{ env.IMAGE }}
+          context: ${{ env.SERVICE_PATH }}
+          dockerfile_path: ${{ env.SERVICE_PATH }}/Dockerfile
+          publish: true
+          tags: ${{ env.IMAGE }}:dev-${{ github.sha }}
+    outputs:
+      image_digest: ${{ steps.build-image.outputs.digest }}
