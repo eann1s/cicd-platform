@@ -10,5 +10,5 @@ resources:
 images:
   - name: go-service
     newName: ghcr.io/eann1s/cicd-platform/go-service
-    digest: sha256:f5cfe38a438b707ec46ce113c6b293ab561bec1a7904ca7a2c03f2057a63a791
+    digest: sha256:65a7852235544586931de3fa41ca74b81dc077e47de37daad721744cbf814988
 
