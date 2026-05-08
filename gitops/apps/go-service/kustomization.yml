@@ -6,9 +6,7 @@ resources:
   - deployment.yml
   - service.yml
   - namespace.yml
-
 images:
   - name: go-service
     newName: ghcr.io/eann1s/cicd-platform/go-service
-    digest: sha256:65a7852235544586931de3fa41ca74b81dc077e47de37daad721744cbf814988
-
+    newTag: dev-85f9a059295771ffe8a1c86ec26b451cf4f7e911
