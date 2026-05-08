@@ -8,7 +8,7 @@ spec:
   
   source:
     repoURL: https://github.com/eann1s/cicd-platform.git
-    targetRevision: feature/gitops-argocd
+    targetRevision: evidence/gitops/broken-rollout
     path: gitops/apps/go-service
 
   destination:

@@ -14,7 +14,7 @@ spec:
   writeBackConfig:
     method: git:secret:argocd/git-write-token
     gitConfig:
-      branch: feature/gitops-argocd
+      branch: evidence/gitops/broken-rollout
       writeBackTarget: kustomization
     
   applicationRefs:
