@@ -1,0 +1,35 @@
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: platform-image-updater
+  namespace: argocd
+spec:
+  commonUpdateSettings:
+    updateStrategy: newest-build
+    allowTags: regexp:^dev-.*
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    
+  writeBackConfig:
+    method: git:secret:argocd/git-write-token
+    gitConfig:
+      branch: feature/gitops-argocd
+      writeBackTarget: kustomization
+    
+  applicationRefs:
+    - namePattern: go-service
+      images:
+        - alias: go
+          imageName: ghcr.io/eann1s/cicd-platform/go-service
+          manifestTargets:
+            kustomize:
+              name: go-service
+    
+    - namePattern: node-service
+      images:
+        - alias: node
+          imageName: ghcr.io/eann1s/cicd-platform/node-service
+          manifestTargets:
+            kustomize:
+              name: node-service
