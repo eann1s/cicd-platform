@@ -6,8 +6,7 @@ resources:
   - service.yml
   - deployment.yml
   - namespace.yml
-
 images:
   - name: node-service
     newName: ghcr.io/eann1s/cicd-platform/node-service
-    digest: sha256:f286b469a11aa88e09c2ddd896f6e58a2b918d93aa91c1b7da7697e3f84cf216
+    newTag: dev-c199853feae5a2d3d88555e8e5b00ae66a13da84
