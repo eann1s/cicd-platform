@@ -9,4 +9,4 @@ resources:
 images:
   - name: node-service
     newName: ghcr.io/eann1s/cicd-platform/node-service
-    newTag: dev-does-not-exist
+    newTag: dev-c199853feae5a2d3d88555e8e5b00ae66a13da84
