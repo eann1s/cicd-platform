@@ -5,6 +5,7 @@ on:
     paths: ["consumers/go-service/**", ".github/workflows/ci-go-service.yml", ".github/workflows/reusable-go-ci.yml", ".github/workflows/reusable-release.yml", ".github/actions/**"]
   push:
     branches: ["master"]
+    tags: ["go-service-v*"]
     paths: ["consumers/go-service/**", ".github/workflows/ci-go-service.yml", ".github/workflows/reusable-go-ci.yml", ".github/workflows/reusable-release.yml", ".github/actions/**"]
 
 jobs:
@@ -26,12 +27,33 @@ jobs:
       image_name: go-service
       platforms: linux/amd64
 
+  release_meta:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/go-service-v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract version
+        id: extract_version
+        run: |
+          echo "version=${GITHUB_REF#refs/tags/go-service-}" >> $GITHUB_OUTPUT
+    outputs:
+      version: ${{ steps.extract_version.outputs.version }}
+  
+  ci_release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/go-service-v')
+    permissions: {contents: read}
+    uses: "./.github/workflows/reusable-go-ci.yml"
+    with:
+      service_path: consumers/go-service
+      image_name: go-service
+      platforms: linux/amd64
+  
   release_push:
-    needs: [ci_push]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: [release_meta, ci_release]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/go-service-v')
     permissions: {contents: read, packages: write, id-token: write}
     uses: "./.github/workflows/reusable-release.yml"
     with:
       service_path: consumers/go-service
       image_name: go-service
       platforms: linux/amd64,linux/arm64
+      tag: ${{ needs.release_meta.outputs.version }}

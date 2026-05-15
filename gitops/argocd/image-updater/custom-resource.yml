@@ -6,7 +6,7 @@ metadata:
 spec:
   commonUpdateSettings:
     updateStrategy: newest-build
-    allowTags: regexp:^dev-.*
+    allowTags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
     platforms:
       - linux/amd64
       - linux/arm64
@@ -14,7 +14,7 @@ spec:
   writeBackConfig:
     method: git:secret:argocd/git-write-token
     gitConfig:
-      branch: feature/gitops-argocd
+      branch: master
       writeBackTarget: kustomization
     
   applicationRefs:

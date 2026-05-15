@@ -8,7 +8,7 @@ spec:
 
   source:
     repoURL: https://github.com/eann1s/cicd-platform.git
-    targetRevision: feature/gitops-argocd
+    targetRevision: master
     path: gitops/apps/node-service
   
   destination:
