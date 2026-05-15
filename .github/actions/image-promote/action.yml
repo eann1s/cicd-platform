@@ -3,6 +3,7 @@ description: Promote image
 inputs:
   image: {required: true, description: "Image to promote"}
   image_digest: {required: true, description: "Digest of the image to promote"}
+  tag: {required: true, description: "Tag to promote"}
 runs:
   using: composite
   steps:
@@ -12,4 +13,5 @@ runs:
         docker buildx imagetools create \
           --tag ${{ inputs.image }}:latest \
           --tag ${{ inputs.image }}:${{ github.sha }} \
+          --tag ${{ inputs.image }}:${{ inputs.tag }} \
           ${{ inputs.image }}@${{ inputs.image_digest }}

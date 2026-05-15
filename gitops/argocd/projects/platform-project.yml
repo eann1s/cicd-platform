@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  description: Platform infratructure apps
+
+  sourceRepos:
+    - https://github.com/eann1s/cicd-platform.git
+  
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: argocd
+    - server: https://kubernetes.default.svc
+      namespace: monitoring
+    - server: https://kubernetes.default.svc
+      namespace: go-service
+    - server: https://kubernetes.default.svc
+      namespace: node-service
+  
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

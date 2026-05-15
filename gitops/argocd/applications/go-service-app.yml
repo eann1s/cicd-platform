@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: go-service
+  namespace: argocd
+spec:
+  project: platform
+  
+  source:
+    repoURL: https://github.com/eann1s/cicd-platform.git
+    targetRevision: master
+    path: gitops/apps/go-service
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: go-service
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

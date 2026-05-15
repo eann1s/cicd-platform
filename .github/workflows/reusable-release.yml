@@ -5,9 +5,11 @@ on:
     inputs:
       service_path: { required: true, type: string }
       image_name: { required: true, type: string }
+      platforms: { required: false, type: string }
+      tag: { required: true, type: string }
 
 env:
-  SCAN_SEVERITY: ${{ github.ref == 'refs/heads/master' && 'HIGH,CRITICAL' || 'CRITICAL' }} # CRITICAL,HIGH on master and CRITICAL on PRs
+  SCAN_SEVERITY: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')) && 'HIGH,CRITICAL' || 'CRITICAL' }} # CRITICAL,HIGH on master and CRITICAL on PRs
   IMAGE: ghcr.io/${{ github.repository }}/${{ inputs.image_name }}
   CERTIFICATE_OIDC_ISSUER: https://token.actions.githubusercontent.com
   CERTIFICATE_IDENTITY: https://github.com/eann1s/cicd-platform/.github/workflows/reusable-release.yml@refs/heads/master
@@ -31,6 +33,7 @@ jobs:
         id: build-image
         uses: ./.github/actions/build-candidate
         with:
+          platforms: ${{ inputs.platforms }}
           images: ${{ env.IMAGE }}
           context: ${{ inputs.service_path }}
           dockerfile_path: ${{ inputs.service_path }}/Dockerfile
@@ -122,3 +125,4 @@ jobs:
         with:
           image: ${{ env.IMAGE }}
           image_digest: ${{ needs.build.outputs.image_digest }}
+          tag: ${{ inputs.tag }}
