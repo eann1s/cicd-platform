@@ -30,3 +30,19 @@ resource "kubernetes_namespace" "node_service" {
     ]
   }
 }
+
+resource "helm_release" "argocd" {
+  name       = "argocd"
+  repository = "https://argoproj.github.io/argo-helm"
+  chart      = "argo-cd"
+  version    = "9.5.14"
+  namespace  = var.argocd_namespace
+}
+
+resource "helm_release" "argocd_image_updater" {
+  name       = "argocd-image-updater"
+  repository = "https://argoproj.github.io/argo-helm"
+  chart      = "argocd-image-updater"
+  version    = "1.2.1"
+  namespace  = var.argocd_namespace
+}

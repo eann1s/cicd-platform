@@ -3,7 +3,6 @@
 set -euo pipefail
 
 CLUSTER_NAME="${1:-argocd}"
-NAMESPACE_NAME="${2:-argocd}"
 
 context_exists() {
     kubectl config get-contexts -o name | grep -Fxq "kind-$CLUSTER_NAME"
@@ -60,25 +59,6 @@ ensure_cluster_ready() {
     fi
 }
 
-argocd_components_ready() {
-  local t="${1:-180s}"
-  kubectl -n "$NAMESPACE_NAME" rollout status deploy/argocd-server --timeout="$t" >/dev/null &&
-  kubectl -n "$NAMESPACE_NAME" rollout status deploy/argocd-repo-server --timeout="$t" >/dev/null &&
-  kubectl -n "$NAMESPACE_NAME" rollout status statefulset/argocd-application-controller --timeout="$t"
-}
-
 ensure_cluster_ready
-
-kubectl get namespace "$NAMESPACE_NAME" > /dev/null 2>&1 || kubectl create namespace "$NAMESPACE_NAME"
-
-kubectl config set-context --current --namespace "$NAMESPACE_NAME"
-
-if ! argocd_components_ready 10s; then
-    echo "Installing ArgoCD..."
-    kubectl apply -n "$NAMESPACE_NAME" --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/7ae7d2cc723f5408b080a31263e705198af08613/manifests/install.yaml
-    argocd_components_ready 180s
-fi
-
-
-
+kubectl config set-context --current --namespace default
 
