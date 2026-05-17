@@ -2,3 +2,6 @@
 .env
 .env.prod
 .terraform/
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.backup
