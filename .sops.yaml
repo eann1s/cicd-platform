@@ -1,0 +1,4 @@
+creation_rules:
+  - path_regex: gitops/secrets/.*\.ya?ml$
+    encrypted_regex: "^(data|stringData)$"
+    age: "age1p6ljghzq69qywmsx9j55d3q8ydnxgw34y3vkrs646cjm5357e48q25uqdv"
