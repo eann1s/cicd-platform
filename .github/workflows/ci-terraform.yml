@@ -1,0 +1,81 @@
+name: ci-terraform
+
+on:
+  pull_request:
+    paths: ["infra/terraform/**", "gitops/argocd/**", ".github/workflows/ci-terraform.yml"]
+  push:
+    branches: ["master"]
+    paths: ["infra/terraform/**", "gitops/argocd/**", ".github/workflows/ci-terraform.yml"]
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    permissions: {contents: read}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Setup-runtime
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e
+      
+      - name: Format check
+        run: |
+          terraform fmt -check -recursive infra/terraform
+      
+      - name: Init platform root
+        run: |
+          terraform -chdir=infra/terraform/envs/local/platform init -backend=false
+      
+      - name: Validate platform root
+        run: |
+          terraform -chdir=infra/terraform/envs/local/platform validate
+      
+      - name: Init gitops-bootstrap root
+        run: |
+          terraform -chdir=infra/terraform/envs/local/gitops-bootstrap init -backend=false
+      
+      - name: Validate gitops-bootstrap root
+        run: |
+          terraform -chdir=infra/terraform/envs/local/gitops-bootstrap validate
+      
+
+  bootstrap-smoke:
+    runs-on: ubuntu-latest
+    permissions: {contents: read}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Setup-runtime
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e
+      
+      - name: Create kind cluster
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc
+        with:
+          cluster_name: argocd
+    
+      - name: Init platform root
+        run: |
+          terraform -chdir=infra/terraform/envs/local/platform init
+      
+      - name: Apply platform root
+        run: |
+          terraform -chdir=infra/terraform/envs/local/platform apply -auto-approve
+      
+      - name: Init gitops-bootstrap root
+        run: |
+          terraform -chdir=infra/terraform/envs/local/gitops-bootstrap init
+      
+      - name: Apply gitops-bootstrap root
+        run: |
+          terraform -chdir=infra/terraform/envs/local/gitops-bootstrap apply -auto-approve
+      
+      - name: Validate objects
+        run: |
+          kubectl get pods -n argocd;
+          kubectl get appproject.argoproj.io platform -n argocd;
+          kubectl get application go-service -n argocd;
+          kubectl get application node-service -n argocd;
+          kubectl get imageupdater platform-image-updater -n argocd;
+      
+
