@@ -65,7 +65,7 @@ resource "helm_release" "argocd_image_updater" {
     yamlencode({
       config = {
         "log.level" = "debug"
-        "git.user" = "argocd-image-updater"
+        "git.user"  = "argocd-image-updater"
         "git.email" = "argocd-image-updater@users.noreply.github.com"
 
         "registries.conf" = <<-EOT
