@@ -35,6 +35,17 @@ resource "kubernetes_namespace" "node_service" {
   }
 }
 
+resource "kubernetes_namespace" "monitoring_namespace" {
+  metadata {
+    name = var.monitoring_namespace
+  }
+  lifecycle {
+    ignore_changes = [
+      metadata[0].annotations
+    ]
+  }
+}
+
 resource "helm_release" "argocd" {
   name       = "argocd"
   repository = "https://argoproj.github.io/argo-helm"
@@ -69,4 +80,12 @@ resource "helm_release" "argocd_image_updater" {
     })
   ]
   depends_on = [kubernetes_namespace.argocd]
+}
+
+resource "helm_release" "kube_prometheus_stack" {
+  name       = "kube-prometheus-stack"
+  repository = "https://prometheus-community.github.io/helm-charts"
+  chart      = "kube-prometheus-stack"
+  version    = "85.2.2"
+  namespace  = var.monitoring_namespace
 }

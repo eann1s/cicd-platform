@@ -12,3 +12,8 @@ variable "node_service_namespace" {
   type    = string
   default = "node-service"
 }
+
+variable "monitoring_namespace" {
+  type    = string
+  default = "monitoring"
+}
