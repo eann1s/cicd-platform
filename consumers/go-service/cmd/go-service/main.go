@@ -10,11 +10,15 @@ import (
 
 	"github.com/eann1s/cicd-platform/consumers/go-service/internal/app"
 	"github.com/eann1s/cicd-platform/consumers/go-service/internal/logger"
+	"github.com/eann1s/cicd-platform/consumers/go-service/internal/middleware"
+	"github.com/eann1s/cicd-platform/consumers/go-service/internal/obs"
 	"github.com/eann1s/cicd-platform/consumers/go-service/internal/readiness"
 	transporthttp "github.com/eann1s/cicd-platform/consumers/go-service/internal/transport/http"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 )
-
 
 var (
 	addr = ":8080"
@@ -38,7 +42,16 @@ func run() error {
 
 	ready := &readiness.AtomicReadiness{}
 
-	srv := newServer(log, ready, addr)
+	reg := prometheus.NewRegistry()
+	m := obs.NewMetrics()
+	reg.MustRegister(
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+		m.RequestsTotal,
+		m.RequestDuration,
+	)
+
+	srv := newServer(log, ready, reg, m, addr)
 
 	app := app.NewApp(srv, ready, log, addr)
 
@@ -49,16 +62,18 @@ func run() error {
 	return nil
 }
 
-func newServer(log zerolog.Logger, ready readiness.Readiness, addr string) *http.Server {
+func newServer(log zerolog.Logger, ready readiness.Readiness, reg *prometheus.Registry, m *obs.Metrics, addr string) *http.Server {
 	deps := transporthttp.Deps{
 		Ready: func() bool {
 			return ready.IsReady()
 		},
+		Metrics: promhttp.HandlerFor(reg, promhttp.HandlerOpts{}),
 	}
 	h := transporthttp.NewHandlers(deps)
-	m := transporthttp.NewMux(h)
+	mux := transporthttp.NewMux(h)
+	handler := middleware.Chain(mux, middleware.HttpMetrics(m))
 	return &http.Server{
 		Addr:    addr,
-		Handler: m,
+		Handler: handler,
 	}
 }

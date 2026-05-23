@@ -11,24 +11,23 @@ import (
 	"github.com/rs/zerolog"
 )
 
-
 var (
 	shutdownTimeout = 5 * time.Second
 )
 
 type App struct {
 	server *http.Server
-	ready readiness.Readiness
-	log zerolog.Logger
-	addr string
+	ready  readiness.Readiness
+	log    zerolog.Logger
+	addr   string
 }
 
 func NewApp(server *http.Server, ready readiness.Readiness, log zerolog.Logger, addr string) *App {
 	return &App{
 		server: server,
-		ready: ready,
-		log: log,
-		addr: addr,
+		ready:  ready,
+		log:    log,
+		addr:   addr,
 	}
 }
 
@@ -84,12 +83,7 @@ func (a *App) Shutdown(ctx context.Context) error {
 		a.log.Error().Err(err).Msg("failed to shutdown server")
 		return err
 	}
-	
+
 	a.log.Info().Msg("app is shut down")
 	return nil
 }
-
-
-
-
-

@@ -2,7 +2,6 @@ package readiness
 
 import "sync/atomic"
 
-
 type Readiness interface {
 	IsReady() bool
 	SetReady(bool)
@@ -19,5 +18,3 @@ func (r *AtomicReadiness) IsReady() bool {
 func (r *AtomicReadiness) SetReady(ready bool) {
 	r.ready.Store(ready)
 }
-
-

@@ -6,7 +6,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-
 func NewLogger(levelStr string, versionStr string) (zerolog.Logger, error) {
 	level, err := zerolog.ParseLevel(levelStr)
 	if err != nil {
