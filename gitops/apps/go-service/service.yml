@@ -3,6 +3,8 @@ kind: Service
 metadata:
   name: go-service
   namespace: go-service
+  labels:
+    app: go-service
 spec:
   type: ClusterIP
   selector:
