@@ -10,4 +10,4 @@ resources:
 images:
   - name: go-service
     newName: ghcr.io/eann1s/cicd-platform/go-service
-    newTag: dev-85f9a059295771ffe8a1c86ec26b451cf4f7e911
+    newTag: v1.0.3
