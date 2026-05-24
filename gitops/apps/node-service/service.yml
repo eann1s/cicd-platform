@@ -4,7 +4,7 @@ metadata:
   name: node-service
   namespace: node-service
   labels:
-    app: go-service
+    app: node-service
 spec:
   type: ClusterIP
   selector:
