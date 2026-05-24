@@ -6,6 +6,7 @@ resources:
   - service.yml
   - deployment.yml
   - namespace.yml
+  - servicemonitor.yml
 images:
   - name: node-service
     newName: ghcr.io/eann1s/cicd-platform/node-service
