@@ -32,7 +32,7 @@ func HttpMetrics(m *obs.Metrics) Middleware {
 			method := r.Method
 			statusClass := getStatusClass(wrapper.status)
 
-			duration := time.Now().Sub(startTime)
+			duration := time.Since(startTime)
 
 			m.RequestsTotal.WithLabelValues(route, method, statusClass).Inc()
 			m.RequestDuration.WithLabelValues(route, method, statusClass).Observe(float64(duration.Seconds()))
