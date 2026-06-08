@@ -28,3 +28,13 @@ spec:
           annotations:
             summary: "Consumer services are unavailable"
             description: "{{ $labels.namespace }}/{{ $labels.deployment }} has fewer available replicas than desired."
+
+        - alert: ConsumerDeploymentRolloutStuck
+          expr: kube_deployment_status_replicas_updated{namespace=~"go-service|node-service"} < kube_deployment_spec_replicas{namespace=~"go-service|node-service"}
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "Consumer services deployment rollout is stuck"
+            description: "{{ $labels.namespace }}/{{ $labels.deployment }} has not completed rollout for more than 5 minutes."
