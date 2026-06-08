@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: consumer-services-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: consumer-services.rules
+      rules:
+        - alert: ConsumerServiceTargetDown
+          expr: up{job=~"go-service|node-service"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "Consumer service target is down"
+            description: "{{ $labels.job }} target {{ $labels.instance }} is down."

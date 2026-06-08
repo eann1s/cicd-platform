@@ -9,7 +9,7 @@ spec:
   source:
     repoURL: https://github.com/eann1s/cicd-platform.git
     targetRevision: master
-    path: gitops/monitoring/grafana-dashboards
+    path: gitops/monitoring/observability
   
   destination:
     server: https://kubernetes.default.svc
