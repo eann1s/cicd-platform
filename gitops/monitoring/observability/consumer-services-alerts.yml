@@ -18,3 +18,13 @@ spec:
           annotations:
             summary: "Consumer service target is down"
             description: "{{ $labels.job }} target {{ $labels.instance }} is down."
+
+        - alert: ConsumerDeploymentUnavailable
+          expr: kube_deployment_status_replicas_available{namespace=~"go-service|node-service"} < kube_deployment_spec_replicas{namespace=~"go-service|node-service"}
+          for: 2m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "Consumer services are unavailable"
+            description: "{{ $labels.namespace }}/{{ $labels.deployment }} has fewer available replicas than desired."
