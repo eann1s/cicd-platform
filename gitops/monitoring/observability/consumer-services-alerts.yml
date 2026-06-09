@@ -30,7 +30,7 @@ spec:
             description: "{{ $labels.namespace }}/{{ $labels.deployment }} has fewer available replicas than desired."
 
         - alert: ConsumerDeploymentRolloutStuck
-          expr: kube_deployment_status_replicas_updated{namespace=~"go-service|node-service"} < kube_deployment_spec_replicas{namespace=~"go-service|node-service"}
+          expr: kube_deployment_status_replicas_unavailable{namespace=~"go-service|node-service"} > 0
           for: 5m
           labels:
             severity: warning
