@@ -88,4 +88,15 @@ resource "helm_release" "kube_prometheus_stack" {
   chart      = "kube-prometheus-stack"
   version    = "85.2.2"
   namespace  = var.monitoring_namespace
+  values = [
+    yamlencode({
+      alertmanager = {
+        alertmanagerSpec = {
+          alertmanagerConfigMatcherStrategy = {
+            type = "None"
+          }
+        }
+      }
+    })
+  ]
 }

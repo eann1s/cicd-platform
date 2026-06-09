@@ -13,7 +13,8 @@ spec:
   receivers:
     - name: telegram
       telegramConfigs:
-        - botToken:
+        - sendResolved: true
+          botToken:
             name: alert-manager-telegram-bot-token
             key: bot-token
           chatID: 743289670
