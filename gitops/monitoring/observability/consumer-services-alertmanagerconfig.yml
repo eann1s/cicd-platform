@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: consumer-services-alertmanagerconfig
+  namespace: monitoring
+spec:
+  route:
+    receiver: telegram
+    matchers:
+      - name: team
+        value: platform
+        matchType: =
+  receivers:
+    - name: telegram
+      telegramConfigs:
+        - botToken:
+            name: alert-manager-telegram-bot-token
+            key: bot-token
+          chatID: 743289670

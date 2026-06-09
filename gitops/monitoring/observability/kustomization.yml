@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - consumer-services-dashboard.yml
   - consumer-services-alerts.yml
+  - consumer-services-alertmanagerconfig.yml
