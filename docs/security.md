@@ -1,6 +1,8 @@
 # Security
 
-This document describes the security controls implemented in the platform, where each lives, and what is explicitly not yet in place. It covers CI permissions, scanning, image signing, secret encryption, and the cloud trust model.
+This document describes the security controls implemented in the platform, where each lives, and what is explicitly not yet in place. It covers CI permissions, scanning, image signing, secret encryption, admission enforcement, repository governance, and the cloud trust model.
+
+This is a **production-oriented foundation**: the practices below are real and enforced, but the runtime is a single-node VPS k3s cluster, not a hardened production environment. Read the [Known limitations](#known-limitations--future-hardening) section alongside the controls.
 
 See also: [Architecture](architecture.md), [Operations](operations.md).
 
@@ -19,9 +21,12 @@ See also: [Architecture](architecture.md), [Operations](operations.md).
 | Registry authentication | `.github/actions/registry-login` (docker/login-action) |
 | Secret encryption at rest in git | `.sops.yaml` + SOPS/age, `gitops/secrets/*.enc.yaml` |
 | Image pull credentials in cluster | `ghcr-pull` secrets (go-service, node-service namespaces) |
+| Telegram bot token handling | SOPS-encrypted Opaque secret `alert-manager-telegram-bot-token` (monitoring namespace) |
+| Admission policy enforcement | Kyverno ClusterPolicies in `Enforce` mode (`gitops/policies/kyverno`, VPS target) |
 | GitHub -> AWS federation | `aws_iam_openid_connect_provider.github_actions` (`infra/terraform/envs/aws/dev`) |
 | ECR push IAM role | `aws_iam_role.github_actions_ecr_push` |
 | Terraform state protection | S3 encryption + public-access-block + DynamoDB lock (`infra/terraform/bootstrap/aws-state`) |
+| Repository governance | `.github/CODEOWNERS` + GitHub branch protection / rulesets |
 | Pinned action SHAs | All third-party actions pinned to commit SHA across workflows/actions |
 
 ## GitHub Actions least-privilege permissions
@@ -144,6 +149,7 @@ Encrypted files under `gitops/secrets/`:
 - `argocd/git-write-token.enc.yaml`: GitHub `username`/`password` for Image Updater git write-back (namespace `argocd`)
 - `go-service/ghcr-pull.enc.yaml`: `dockerconfigjson` pull secret (namespace `go-service`)
 - `node-service/ghcr-pull.enc.yaml`: `dockerconfigjson` pull secret (namespace `node-service`)
+- `monitoring/alert-manager-telegram-bot-token.enc.yaml`: Opaque secret (`bot-token`) Alertmanager uses to authenticate to the Telegram bot API (namespace `monitoring`)
 
 Apply flow (`gitops/secrets/apply-secrets.sh`):
 
@@ -153,7 +159,13 @@ sops -d gitops/secrets/argocd/ghcr-image-updater.enc.yaml | kubectl apply -f -
 sops -d gitops/secrets/argocd/git-write-token.enc.yaml     | kubectl apply -f -
 sops -d gitops/secrets/go-service/ghcr-pull.enc.yaml        | kubectl apply -f -
 sops -d gitops/secrets/node-service/ghcr-pull.enc.yaml      | kubectl apply -f -
+sops -d gitops/secrets/monitoring/alert-manager-telegram-bot-token.enc.yaml | kubectl apply -f -
 ```
+
+The Telegram bot token never appears in plaintext in git, only the encrypted `bot-token` field is
+committed, and Alertmanager reads it from the in-cluster secret by name (`botToken.name:
+alert-manager-telegram-bot-token`, `key: bot-token` in the AlertmanagerConfig). Rotate it by
+re-encrypting the file and re-running `apply-secrets.sh`.
 
 The age private key must be present locally at `SOPS_AGE_KEY_FILE`. Secrets are decrypted and applied out-of-band, not synced by ArgoCD.
 
@@ -223,14 +235,62 @@ Resource: arn of cicd-platform-dev-go-service ECR repository
 
 The ECR repository (`aws_ecr_repository.go_service`, `cicd-platform-dev-go-service`) is created with `IMMUTABLE` tags and scan-on-push enabled.
 
+## Admission enforcement (Kyverno)
+
+On the VPS target, Kyverno (Helm chart v3.8.1, namespace `kyverno`) enforces two ClusterPolicies,
+delivered by GitOps through `policies-app` (`gitops/policies/kyverno`). Both are
+`validationFailureAction: Enforce` and `background: true`, scoped by name to the `go-service` and
+`node-service` namespaces:
+
+- `require-resources`: rejects any Pod whose containers do not declare CPU **and** memory **requests
+  and limits**. This prevents unbounded workloads and keeps the cluster's scheduling predictable.
+- `disallow-privileged-containers`: rejects privileged containers, Pods using host namespaces
+  (`hostPID`, `hostNetwork`, `hostIPC`), and `hostPath` volumes, the common container-escape and
+  host-access vectors.
+
+This is admission-time **policy** enforcement at deploy time, complementing the build-time controls.
+It is namespace-scoped: a new service namespace is not covered until added to the policies'
+`match.namespaces` lists. The **local** target does not install Kyverno, so these checks run on the
+VPS runtime only. See [Operations](operations.md#runbook-verify-kyverno-policies-vps) for how to
+verify enforcement.
+
+Note this enforces resource/privilege posture, **not** image signatures. Cosign verification still
+happens only inside the release pipeline (see [Known limitations](#known-limitations--future-hardening)).
+
+## Repository governance
+
+- **CODEOWNERS** (`.github/CODEOWNERS`) assigns ownership of every significant path (`/.github/`, both
+  consumer services, `/infra/terraform/`, `/gitops/`, `/gitops/secrets/`, `/docs/`, `/obs/`,
+  `/scripts/`, `.sops.yaml`, `.gitignore`, `README.md`) so changes require review from the code owner.
+- **Branch protection / rulesets** on `master` are configured in GitHub (not codified in the repo) and
+  are expected to: require pull requests, require code-owner review, require passing CI status checks,
+  and block force pushes and branch deletion. Because these live in GitHub settings, confirm them in
+  the repository's branch-protection / ruleset configuration rather than assuming from the repo tree.
+
 ## Known limitations / future hardening
 
-The following are NOT yet implemented. They are listed so the gaps are explicit.
+The following are NOT yet implemented or are deliberately scoped down. They are listed so the gaps are
+explicit, this is a foundation, not a hardened production system.
 
-- **No admission-time signature enforcement.** Cosign verification runs only inside the release pipeline. There is no admission controller (e.g. Kyverno, Gatekeeper, or Sigstore policy-controller) blocking unsigned or unverified images at deploy time. The cluster does not re-verify signatures.
-- **No full environment separation.** Only a `dev` AWS environment and a local KinD environment exist. There is no staging/prod split, no separate AWS accounts, and no per-environment state isolation beyond the single `dev` backend.
-- **Secrets not KMS-backed.** SOPS uses a single age recipient. There is no AWS KMS (or other cloud KMS) key, no key rotation policy, and the age private key is managed manually on the operator's machine.
-- **No EKS / IRSA / External Secrets.** Workloads run on local KinD. There is no EKS cluster, no IAM Roles for Service Accounts (IRSA), and no External Secrets Operator pulling from a secrets manager. In-cluster secrets are static, manually applied dockerconfigjson values.
-- **Limited branch/environment protections in CI.** OIDC trust is restricted to `master` and `go-service-v*` tags, but there are no GitHub Environments with required reviewers, no deployment gates, and no documented branch protection rules enforcing review/status checks before merge.
-- **SBOM and scan reports are artifacts only.** They are uploaded to the workflow run but not signed, attested to the image, or stored in a durable/queryable location.
-- **AWS network is public-subnet only.** The dev VPC has public subnets with an Internet Gateway and no private subnets or NAT; not intended for hosting workloads as-is.
+- **Single-node VPS, not HA.** The runtime is a single-node k3s cluster. There is no node redundancy,
+  no control-plane HA, and a host failure takes the whole platform down. It is not a managed production
+  cluster.
+- **No admission-time signature enforcement.** Kyverno enforces resource and privilege policies, but
+  nothing re-verifies Cosign signatures at deploy time. Cosign verification runs only inside the
+  release pipeline; the cluster does not block unsigned images.
+- **No full secret operator.** SOPS uses a single age recipient with no cloud KMS backing and no
+  rotation policy; the age private key is managed manually on the operator's machine. There is no
+  External Secrets Operator or secrets manager. In-cluster secrets are static and applied out of band
+  via `apply-secrets.sh`.
+- **No managed production cluster / environment separation.** Only a `dev` AWS footprint, a local KinD
+  environment, and the single VPS exist. There is no staging/prod split, no separate AWS accounts, and
+  no per-environment state isolation beyond the single `dev` backend. AWS is a supporting foundation
+  (ECR, OIDC, state, VPC), not the app runtime.
+- **No full incident-management / SLO process.** Alerts route to Telegram, but there is no on-call
+  rotation, no defined SLOs/SLIs, no error budgets, and no runbook automation beyond this document.
+- **No centralized long-term log storage.** Logs are viewed ad hoc via `kubectl logs`. There is no
+  aggregation, retention, or queryable log store (e.g. Loki/ELK) in the platform today.
+- **SBOM and scan reports are artifacts only.** They are uploaded to the workflow run but not signed,
+  attested to the image, or stored in a durable/queryable location.
+- **AWS network is public-subnet only.** The dev VPC has public subnets with an Internet Gateway and no
+  private subnets or NAT; it is a foundation, not a workload-hosting network as-is.

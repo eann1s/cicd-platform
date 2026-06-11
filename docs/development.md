@@ -147,7 +147,7 @@ Kubernetes probe config (from the deployments):
   - `http_requests_total` (counter), labels `route`/`method`/`status_class` (go-service) and `method`/`route`/`status_class` (node-service).
   - `http_request_duration_seconds` (histogram), same labels.
   - Default Go runtime / process collectors (go-service) and `prom-client` default metrics (node-service).
-- The Grafana "Consumers" dashboard ([gitops/monitoring/grafana-dashboards/consumer-services-dashboard.yml](../gitops/monitoring/grafana-dashboards/consumer-services-dashboard.yml)) queries `http_requests_total`, `http_request_duration_seconds_bucket`, and `up{job=~"go-service|node-service"}`, so the metric names above are load-bearing.
+- The Grafana "Consumers" dashboard ([gitops/monitoring/observability/consumer-services-dashboard.yml](../gitops/monitoring/observability/consumer-services-dashboard.yml)) queries `http_requests_total`, `http_request_duration_seconds_bucket`, and `up{job=~"go-service|node-service"}`, so the metric names above are load-bearing. The PrometheusRule alerts in the same directory also key off `up{job=~"go-service|node-service"}`.
 
 ### Kubernetes manifests (`gitops/apps/<svc>/`)
 
@@ -172,6 +172,26 @@ Resource sizing differs per service:
 |--|-----------|--------------|
 | CPU request / limit | 100m / 500m | 250m / 1000m |
 | Memory request / limit | 256Mi / 512Mi | 512Mi / 1024Mi |
+
+### Admission policy requirements (Kyverno, VPS target)
+
+On the VPS target, Kyverno ClusterPolicies (`gitops/policies/kyverno/`) run in `Enforce` mode against
+Pods in the `go-service` and `node-service` namespaces. A workload that violates them is rejected at
+admission, so the deployment manifests above must satisfy:
+
+- **Resource requests and limits** for every container, both CPU and memory, requests *and* limits
+  (`require-resources`). The sizing table above already meets this; dropping any of the four values
+  will fail admission.
+- **No privileged containers**, `securityContext.privileged` must be unset or `false`
+  (`disallow-privileged-containers`).
+- **No host namespaces**, the Pod must not set `hostPID`, `hostNetwork`, or `hostIPC`.
+- **No hostPath volumes**, `volumes[].hostPath` is disallowed.
+
+These policies are namespace-scoped by name to `go-service` and `node-service`; a new service in a new
+namespace is not covered until you extend the policy `match.namespaces` lists (see [adding a new
+service](#how-to-add-a-new-service)). The local target does not install Kyverno, so the same manifests
+are admitted there without policy checks, keep them policy-compliant anyway so they deploy unchanged
+on the VPS.
 
 ### CI workflow caller
 
@@ -218,8 +238,9 @@ Replace `<svc>` with the service name (used as the image name and namespace) thr
 4. **Register the ArgoCD Application** at `gitops/argocd/applications/<svc>-app.yml`:
    - `project: platform`, `repoURL: https://github.com/eann1s/cicd-platform.git`, `targetRevision: master`, `path: gitops/apps/<svc>`, destination namespace `<svc>`, automated sync with `prune: true`, `selfHeal: true`, `CreateNamespace=true`.
    - Add the `<svc>` namespace to the destinations list in `gitops/argocd/projects/platform-project.yml` (the AppProject whitelists destination namespaces).
-   - Register the manifest in `infra/terraform/envs/local/gitops-bootstrap/main.tf` if you want the local bootstrap to apply it (the existing apps are each a `kubernetes_manifest` resource there).
+   - Register the manifest as a `kubernetes_manifest` resource in the gitops-bootstrap roots you use: `infra/terraform/envs/local/gitops-bootstrap/main.tf` and/or `infra/terraform/envs/vps/gitops-bootstrap/main.tf` (the existing apps are each a `kubernetes_manifest` there).
    - Add an `applicationRefs` entry in `gitops/argocd/image-updater/custom-resource.yml` if Image Updater should track the new image (alias + `imageName: ghcr.io/eann1s/cicd-platform/<svc>` + kustomize target `<svc>`).
+   - To get the same admission enforcement on the VPS target, add `<svc>` to the `match.namespaces` lists in `gitops/policies/kyverno/require-resources.yml` and `gitops/policies/kyverno/disallow-privileged-containers.yml`. Without this the new namespace is unenforced.
 
 5. **Add the `ghcr-pull` secret** for the new namespace:
    - Create `gitops/secrets/<svc>/ghcr-pull.enc.yaml`, a `kubernetes.io/dockerconfigjson` Secret named `ghcr-pull` in namespace `<svc>`, encrypted with SOPS per `.sops.yaml` (only `data`/`stringData` are encrypted).

@@ -2,10 +2,23 @@
 
 This document describes how the cicd-platform repository fits together: how code becomes a signed
 container image, how that image lands in a Kubernetes cluster through GitOps, how new image versions
-are promoted automatically, and how the platform is observed, secured, and connected to AWS.
+are promoted automatically, how the platform is observed and alerted on, how admission policies are
+enforced, and how it connects to AWS.
 
-Repository owner/repo throughout: `eann1s/cicd-platform`. The local Kubernetes target is a KinD
-cluster named `argocd`.
+Repository owner/repo throughout: `eann1s/cicd-platform`.
+
+## Targets and responsibilities
+
+The platform runs against three independent targets.
+
+| Target | Cluster / footprint | Responsibility |
+|--------|--------------------|----------------|
+| **Local** | KinD cluster, default name `argocd` (context `kind-argocd`) | Develop and test the platform end to end. No Kyverno, no Alertmanager wiring by default. |
+| **VPS / k3s** | Single-node k3s cluster, kube context `do-k3s-dev` (overridable) | The real cluster runtime: ArgoCD, Image Updater, kube-prometheus-stack + Alertmanager, Kyverno, and the consumer apps. Single-node, **not HA**. |
+| **AWS dev** | `dev` account footprint | Supporting services: ECR, GitHub OIDC + IAM, S3/DynamoDB Terraform state backend, minimal VPC. **Not the app runtime.** |
+
+Terraform installs platform components onto an **already-running** cluster (it reads `~/.kube/config`);
+it does not create the KinD or k3s cluster. Create the cluster first, point kubeconfig at it, then apply.
 
 ## System overview
 
@@ -22,10 +35,13 @@ The moving parts:
   `.github/actions/`. They lint, test, scan, build, sign, and publish images to GHCR.
 - **GitOps**: ArgoCD (installed via Helm by Terraform) syncs Kubernetes manifests from
   `gitops/` into the cluster. ArgoCD Image Updater promotes new image tags back into git.
-- **Observability**: kube-prometheus-stack provides Prometheus + Grafana; ServiceMonitors drive
-  scraping; a Grafana dashboard ConfigMap renders service metrics.
+- **Observability**: kube-prometheus-stack provides Prometheus + Grafana + Alertmanager;
+  ServiceMonitors drive scraping; a Grafana dashboard ConfigMap renders service metrics; a
+  PrometheusRule fires alerts; an AlertmanagerConfig routes them to Telegram.
+- **Admission enforcement**: Kyverno ClusterPolicies (VPS target) validate every Pod created in the
+  service namespaces.
 - **Secrets**: SOPS + age encrypt Kubernetes Secrets in `gitops/secrets/`, applied out of band.
-- **Infrastructure**: Terraform under `infra/terraform/` bootstraps the local cluster's platform
+- **Infrastructure**: Terraform under `infra/terraform/` bootstraps the local and VPS platform
   components and the AWS dev environment (ECR, GitHub OIDC, IAM, VPC).
 
 Image registries:
@@ -106,37 +122,42 @@ flowchart LR
 
 ## GitOps deployment flow
 
-ArgoCD runs in the `argocd` namespace of the KinD cluster `argocd`. It is installed by Terraform
-(see below), and its objects are bootstrapped from `gitops/argocd/`.
+ArgoCD runs in the `argocd` namespace. It is installed by Terraform (see [Bootstrap order](#bootstrap-order))
+and its objects are bootstrapped from `gitops/argocd/`.
 
 ### Project and applications
 
 - AppProject `gitops/argocd/projects/platform-project.yml`, name `platform`, namespace `argocd`.
-  Allowed source repo `https://github.com/eann1s/cicd-platform.git`; allowed destinations:
-  `argocd`, `monitoring`, `go-service`, `node-service`.
+  Allowed source repo `https://github.com/eann1s/cicd-platform.git`; allowed destination namespaces:
+  `argocd`, `monitoring`, `go-service`, `node-service`, `kyverno`.
 - Applications (all `project: platform`, `targetRevision: master`, automated sync with
   `prune: true`, `selfHeal: true`, `CreateNamespace=true`):
-  - `gitops/argocd/applications/go-service-app.yml` -> path `gitops/apps/go-service` ->
-    namespace `go-service`.
-  - `gitops/argocd/applications/node-service-app.yml` -> path `gitops/apps/node-service` ->
-    namespace `node-service`.
-  - `gitops/argocd/applications/monitoring-app.yml` -> path
-    `gitops/monitoring/grafana-dashboards` -> namespace `monitoring`.
+
+  | Application | Source path | Destination namespace | Notes |
+  |-------------|-------------|-----------------------|-------|
+  | `go-service` | `gitops/apps/go-service` | `go-service` | Consumer app |
+  | `node-service` | `gitops/apps/node-service` | `node-service` | Consumer app |
+  | `monitoring-app` | `gitops/monitoring/observability` | `monitoring` | Dashboard + PrometheusRule + AlertmanagerConfig |
+  | `policies-app` | `gitops/policies/kyverno` | `kyverno` | Kyverno ClusterPolicies (registered by the **VPS** gitops-bootstrap only) |
+
+The local gitops-bootstrap registers the first three apps plus the Image Updater CR. The VPS
+gitops-bootstrap also registers `policies-app`. (Kyverno itself is only installed by the
+VPS platform root, so the policies app belongs to the VPS target.)
 
 ### Rendered manifests
 
 Each service's Kustomize app (`gitops/apps/<svc>/kustomization.yml`) renders:
 
 - `deployment.yml`: 3 replicas, RollingUpdate (`maxUnavailable: 0`, `maxSurge: 1`), pull secret
-  `ghcr-pull`, readiness `/readyz`, liveness `/healthz`. go-service container port 8080
-  (req 100m/256Mi, lim 500m/512Mi); node-service container port 3000 (req 250m/512Mi,
-  lim 1000m/1024Mi).
+  `ghcr-pull`, readiness `/readyz`, liveness `/healthz`, resource requests/limits. go-service
+  container port 8080 (req 100m/256Mi, lim 500m/512Mi); node-service container port 3000
+  (req 250m/512Mi, lim 1000m/1024Mi).
 - `service.yml`: ClusterIP, port 80 -> targetPort 8080 (go) / 3000 (node).
 - `namespace.yml`: the service namespace.
-- `servicemonitor.yml`: Prometheus scrape config (see Observability).
+- `servicemonitor.yml`: Prometheus scrape config (see [Observability](#observability-flow)).
 
-The kustomization `images:` block pins the deployed tag, e.g. go-service
-`ghcr.io/eann1s/cicd-platform/go-service:v1.0.3` and node-service `:v1.0.3`.
+The kustomization `images:` block pins the deployed tag, e.g.
+`ghcr.io/eann1s/cicd-platform/go-service:v1.0.3`. This `newTag` is what Image Updater rewrites.
 
 ```mermaid
 flowchart LR
@@ -145,6 +166,7 @@ flowchart LR
   argo --> goapp[Application go-service] --> gons[ns go-service]
   argo --> nodeapp[Application node-service] --> nodens[ns node-service]
   argo --> monapp[Application monitoring-app] --> monns[ns monitoring]
+  argo --> polapp[Application policies-app<br/>VPS only] --> kyvns[ns kyverno]
 ```
 
 ## Image update / promotion flow
@@ -175,11 +197,41 @@ flowchart LR
   argo --> pods[Rolling update pods]
 ```
 
+## Admission enforcement flow (Kyverno)
+
+Kyverno is installed by the VPS platform root (Helm chart `kyverno` v3.8.1, namespace `kyverno`) and
+its ClusterPolicies are delivered by GitOps through `policies-app` (`gitops/policies/kyverno`,
+Kustomize). Both policies are `validationFailureAction: Enforce` and match Pods only in the
+`go-service` and `node-service` namespaces:
+
+- `require-resources`: every container must declare CPU and memory **requests and limits**. A Pod
+  missing any of them is rejected at admission.
+- `disallow-privileged-containers`: containers must not be privileged; the Pod must not use host
+  namespaces (`hostPID`, `hostNetwork`, `hostIPC`); volumes must not use `hostPath`.
+
+Because the policies enforce the same resource shape the deployments already declare, a correctly
+authored consumer app is admitted; a regression (dropped limits, a privileged container) is blocked
+before it runs. This is admission-time **policy** enforcement, not image-signature enforcement,
+Cosign verification still happens only inside the release pipeline (see [Security](security.md)).
+
+```mermaid
+flowchart LR
+  argo[ArgoCD sync] --> api[k8s API server]
+  api --> adm{Kyverno admission}
+  adm -->|requests/limits set,<br/>non-privileged| ok[Pod admitted]
+  adm -->|violates policy| rej[Pod rejected]
+```
+
 ## Observability flow
 
 The monitoring stack is kube-prometheus-stack (Helm release `kube-prometheus-stack`, chart
 v85.2.2) in the `monitoring` namespace, installed by Terraform. It provides the Prometheus
 Operator, Prometheus, Grafana, and Alertmanager.
+
+On the VPS target the Helm values set
+`alertmanager.alertmanagerSpec.alertmanagerConfigMatcherStrategy.type: None`, which stops
+Alertmanager from auto-injecting a namespace matcher into AlertmanagerConfig objects, so the route
+matchers in `consumer-services-alertmanagerconfig.yml` are then used exactly as written.
 
 - **Scraping**: ServiceMonitors `gitops/apps/go-service/servicemonitor.yml` and
   `gitops/apps/node-service/servicemonitor.yml` live in the `monitoring` namespace with label
@@ -191,16 +243,36 @@ Operator, Prometheus, Grafana, and Alertmanager.
   custom histogram buckets `[0.005 ... 10]`.
 - **Dashboard**: source `obs/grafana/dashboards/consumer-services.json` is packaged as the
   ConfigMap `consumer-services-dashboard` in
-  `gitops/monitoring/grafana-dashboards/consumer-services-dashboard.yml` (label
+  `gitops/monitoring/observability/consumer-services-dashboard.yml` (label
   `grafana_dashboard: "1"`), deployed by the `monitoring-app` Application. Grafana's provisioning
   sidecar auto-loads it. Title "Consumers" (UID `aae1205c-041d-4a88-8817-01dca5211ccd`), panels:
   Request rate, Error rate, p95 latency, Service targets up.
 
-Local access (KinD does not expose services externally):
+### Alerting
 
-```bash
-kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80
-kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090:9090
+The `monitoring-app` also delivers the alerting objects in `gitops/monitoring/observability`:
+
+- **PrometheusRule** `consumer-services-alerts` (label `release: kube-prometheus-stack`,
+  group `consumer-services.rules`). All rules carry `team: platform`:
+  - `ConsumerServiceTargetDown`, `up{job=~"go-service|node-service"} == 0` for 2m (critical).
+  - `ConsumerDeploymentUnavailable`, available replicas below desired for 2m (critical).
+  - `ConsumerDeploymentRolloutStuck`, unavailable replicas > 0 for 5m (warning).
+- **AlertmanagerConfig** `consumer-services-alertmanagerconfig`: route `receiver: telegram`,
+  matching `team = platform`; the `telegram` receiver reads the bot token from the
+  `alert-manager-telegram-bot-token` secret (key `bot-token`) and posts to a chat ID,
+  `sendResolved: true`.
+
+So an alert labeled `team: platform` fires in Prometheus -> Alertmanager matches the route ->
+Telegram message (and a resolved message when it clears).
+
+```mermaid
+flowchart LR
+  svc[go/node service /metrics] --> sm[ServiceMonitors]
+  sm --> prom[Prometheus]
+  prom --> graf[Grafana: Consumers dashboard]
+  prom --> rules[PrometheusRule team=platform]
+  rules --> am[Alertmanager<br/>AlertmanagerConfig route team=platform]
+  am -->|bot-token secret| tg[Telegram chat]
 ```
 
 ## Secrets flow
@@ -221,6 +293,7 @@ Encrypted secrets and what they unlock:
 | `gitops/secrets/argocd/git-write-token.enc.yaml` | `argocd` / `git-write-token` | Opaque (`username`,`password`) | Image Updater committing new tags to git |
 | `gitops/secrets/go-service/ghcr-pull.enc.yaml` | `go-service` / `ghcr-pull` | dockerconfigjson | kubelet pulling go-service images |
 | `gitops/secrets/node-service/ghcr-pull.enc.yaml` | `node-service` / `ghcr-pull` | dockerconfigjson | kubelet pulling node-service images |
+| `gitops/secrets/monitoring/alert-manager-telegram-bot-token.enc.yaml` | `monitoring` / `alert-manager-telegram-bot-token` | Opaque (`bot-token`) | Alertmanager authenticating to the Telegram bot API |
 
 Apply them after the namespaces exist:
 
@@ -235,7 +308,8 @@ region `eu-north-1`, profile `cicd-platform-dev`, S3 remote backend). Its remote
 bootstrapped first by `infra/terraform/bootstrap/aws-state/` (S3 bucket
 `cicd-platform-dev-tfstate-980481493011`, DynamoDB lock table `cicd-platform-dev-tflock`).
 
-The dev environment creates a keyless push path for GitHub Actions:
+AWS is a **supporting foundation**, not the app runtime. The dev environment creates a keyless push
+path for GitHub Actions plus a minimal VPC:
 
 - **OIDC provider** `aws_iam_openid_connect_provider.github_actions`, URL
   `https://token.actions.githubusercontent.com`, audience `sts.amazonaws.com`.
@@ -273,15 +347,22 @@ flowchart TD
   ghcr --> iu[ArgoCD Image Updater<br/>platform-image-updater]
   iu -->|writeBack git| repo[(git: gitops/apps/*/kustomization.yml)]
   repo --> argo[ArgoCD apps<br/>go-service, node-service]
-  argo --> cluster[KinD cluster argocd<br/>ns go-service / node-service]
+  argo --> kyv{Kyverno admission}
+  kyv --> cluster[Cluster<br/>ns go-service / node-service]
   cluster --> sm[ServiceMonitors]
   sm --> prom[Prometheus]
   prom --> graf[Grafana: Consumers dashboard]
+  prom --> am[Alertmanager -> Telegram]
 ```
 
-## Terraform bootstrap (local)
+## Bootstrap order
 
-Local cluster startup order:
+The apply order is the same for local and VPS; only the Terraform roots and kube context differ. The
+ordering rule that matters: **apply the secrets before the gitops-bootstrap**, because the bootstrap
+creates the ArgoCD Applications that deploy the service pods. If `ghcr-pull` is not present yet, those
+pods land in `ImagePullBackOff` until the secret exists.
+
+### Local
 
 ```bash
 scripts/kind-up.sh argocd
@@ -290,15 +371,31 @@ terraform -chdir=infra/terraform/envs/local/platform apply
 terraform -chdir=infra/terraform/envs/local/gitops-bootstrap apply
 ```
 
-Apply the secrets before `gitops-bootstrap`: the bootstrap creates the ArgoCD Applications, which deploy the service pods. If `ghcr-pull` is not present yet, those pods land in `ImagePullBackOff` until the secret exists.
-
 - `infra/terraform/envs/local/platform/` (providers kubernetes ~> 2.36, helm ~> 3.1), creates
   namespaces `argocd`, `go-service`, `node-service`, `monitoring`; installs Helm releases `argocd`
-  (argo-cd v9.5.14), `argocd-image-updater` (v1.2.1), `kube-prometheus-stack` (v85.2.2).
-- `infra/terraform/envs/local/gitops-bootstrap/`: applies the AppProject, three Applications, and
-  the ImageUpdater custom resource via `kubernetes_manifest`.
+  (argo-cd v9.5.14), `argocd-image-updater` (v1.2.1), `kube-prometheus-stack` (v85.2.2). No Kyverno.
+- `infra/terraform/envs/local/gitops-bootstrap/`: applies the AppProject, the go/node/monitoring
+  Applications, and the ImageUpdater custom resource via `kubernetes_manifest`. No policies app.
 
 Tear down with `scripts/kind-down.sh argocd`.
+
+### VPS / k3s
+
+The k3s cluster must already exist and be reachable through the kube context (default `do-k3s-dev`).
+
+```bash
+terraform -chdir=infra/terraform/envs/vps/platform apply
+./gitops/secrets/apply-secrets.sh
+terraform -chdir=infra/terraform/envs/vps/gitops-bootstrap apply
+```
+
+- `infra/terraform/envs/vps/platform/`: same namespaces plus `kyverno`; Helm releases `argocd`,
+  `argocd-image-updater`, `kube-prometheus-stack` (with the Alertmanager matcher-strategy value
+  above), and `kyverno` (v3.8.1).
+- `infra/terraform/envs/vps/gitops-bootstrap/`: applies the AppProject, the go/node/monitoring
+  Applications, the `policies-app`, and the ImageUpdater CR.
+
+See [Operations](operations.md) for the full VPS runbook and verification steps.
 
 ## Future extensions
 
@@ -308,4 +405,7 @@ exist:
 - ECR repositories and a release/push path for `node-service` (only `cicd-platform-dev-go-service`
   exists; the OIDC trust subject covers only `go-service-v*` tags).
 - Private subnets / NAT in the AWS dev VPC (public subnets only today).
+- A managed, multi-node, highly-available production cluster (the runtime is single-node k3s).
 - ArgoCD-managed secret delivery (secrets are applied manually via `apply-secrets.sh`).
+- Admission-time image-signature enforcement (Kyverno enforces resource/privilege policies, not
+  Cosign signatures).
