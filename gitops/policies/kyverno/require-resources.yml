@@ -12,6 +12,9 @@ spec:
           - resources:
               kinds:
                 - Pod
+              namespaces:
+                - go-service
+                - node-service
       validate:
         message: "Pods must define CPU and memory requests and limits for every container."
         pattern:
