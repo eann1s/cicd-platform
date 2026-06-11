@@ -18,6 +18,8 @@ spec:
       namespace: go-service
     - server: https://kubernetes.default.svc
       namespace: node-service
+    - server: https://kubernetes.default.svc
+      namespace: kyverno
   
   clusterResourceWhitelist:
     - group: "*"
