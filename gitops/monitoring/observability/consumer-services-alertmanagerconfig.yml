@@ -17,4 +17,4 @@ spec:
           botToken:
             name: alert-manager-telegram-bot-token
             key: bot-token
-          chatID: 743289670
+          chatID: 111111111

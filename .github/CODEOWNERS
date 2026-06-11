@@ -1,0 +1,12 @@
+/.github/ @eann1s
+/consumers/go-service/ @eann1s
+/consumers/node-service/ @eann1s
+/infra/terraform/ @eann1s
+/docs/ @eann1s
+/gitops/ @eann1s
+/gitops/secrets/ @eann1s
+/.gitignore @eann1s
+/.sops.yaml @eann1s
+/README.md @eann1s
+/obs/ @eann1s
+/scripts/ @eann1s
