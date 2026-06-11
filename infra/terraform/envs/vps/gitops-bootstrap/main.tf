@@ -18,6 +18,10 @@ resource "kubernetes_manifest" "monitoring_app" {
   manifest = yamldecode(file("${local.repo_root}/gitops/argocd/applications/monitoring-app.yml"))
 }
 
+resource "kubernetes_manifest" "policies_app" {
+  manifest = yamldecode(file("${local.repo_root}/gitops/argocd/applications/policies-app.yml"))
+}
+
 resource "kubernetes_manifest" "image_updater_cr" {
   manifest = yamldecode(file("${local.repo_root}/gitops/argocd/image-updater/custom-resource.yml"))
 }

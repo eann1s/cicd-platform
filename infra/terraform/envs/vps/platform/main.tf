@@ -100,3 +100,18 @@ resource "helm_release" "kube_prometheus_stack" {
     })
   ]
 }
+
+resource "kubernetes_namespace" "kyverno" {
+  metadata {
+    name = var.kyverno_namespace
+  }
+}
+
+resource "helm_release" "kyverno" {
+  name       = "kyverno"
+  repository = "https://kyverno.github.io/kyverno"
+  chart      = "kyverno"
+  version    = "3.8.1"
+  namespace  = var.kyverno_namespace
+  depends_on = [kubernetes_namespace.kyverno]
+}

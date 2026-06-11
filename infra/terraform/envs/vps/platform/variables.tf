@@ -22,3 +22,8 @@ variable "kube_context" {
   type    = string
   default = "do-k3s-dev"
 }
+
+variable "kyverno_namespace" {
+  type    = string
+  default = "kyverno"
+}
