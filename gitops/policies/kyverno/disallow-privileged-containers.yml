@@ -1,0 +1,60 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-privileged-containers
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: disallow-privileged
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - go-service
+                - node-service
+      validate:
+        message: "Containers must not be privileged."
+        pattern:
+          spec:
+            containers:
+              - name: "*"
+                =(securityContext):
+                  =(privileged): "false"
+
+    - name: disallow-host-namespaces
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - go-service
+                - node-service
+      validate:
+        message: "Containers must not use host-namespaces."
+        pattern:
+          spec:
+            =(hostPID): "false"
+            =(hostNetwork): "false"
+            =(hostIPC): "false"
+                
+
+    - name: disallow-host-path
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - go-service
+                - node-service
+      validate:
+        message: "Containers must not use host-path."
+        pattern:
+          spec:
+            =(volumes):
+              - X(hostPath): "null"
+
