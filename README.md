@@ -82,6 +82,10 @@ A commit to a service triggers CI (lint, test, scan, build a candidate image). O
 
 ## Quick start: local target
 
+> Forking this to run your own instance? The quick starts below assume the owner-specific
+> identifiers, your age key, and the encrypted secrets are already yours. A fresh fork is none of
+> those — start with [Adoption](docs/adoption.md), then come back here.
+
 ```bash
 # 1. Create (or recover) the local KinD cluster, defaults to cluster name "argocd"
 scripts/kind-up.sh
@@ -142,6 +146,7 @@ Push a tag `go-service-v<version>` or `node-service-v<version>`. The version is 
 
 ## Documentation
 
+- [Adoption](docs/adoption.md): forking this repo to run your own instance — owner identifiers to change, generating your age key, creating the secrets from scratch, GitHub/AWS settings.
 - [Architecture](docs/architecture.md): how the pieces fit together, local/VPS/AWS responsibilities, end-to-end flow, bootstrap order.
 - [Development](docs/development.md): working on the services, the service contract, adding a new service, release tags.
 - [Infrastructure](docs/infrastructure.md): every Terraform root, state backend, safe apply order.

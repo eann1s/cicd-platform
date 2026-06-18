@@ -9,7 +9,7 @@ A note on scope: the platform roots install components **onto a cluster that alr
 read `~/.kube/config`). They do not create the KinD or k3s cluster, the VPS, or any compute. Create
 the cluster, point kubeconfig at it, then apply.
 
-See also: [Architecture](architecture.md), [Operations](operations.md), [Security](security.md).
+See also: [Adoption](adoption.md) (forking — account/region/profile/bucket to change before applying the AWS roots), [Architecture](architecture.md), [Operations](operations.md), [Security](security.md).
 
 ## Terraform root layout
 

@@ -130,7 +130,9 @@ Note: verification runs inside the same release pipeline that produced the signa
 
 ## SOPS + age secrets
 
-Kubernetes secrets are committed encrypted, using SOPS with an age recipient.
+Kubernetes secrets are committed encrypted, using SOPS with an age recipient. The committed files are
+encrypted to the **original owner's** recipient; a fork cannot decrypt them and must re-key and
+re-create them — see [Adoption](adoption.md#step-2-generate-your-own-age-key).
 
 Rules (`.sops.yaml`):
 
